@@ -20,33 +20,17 @@ def main() -> None:
     Main function
     """
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-i", help="input source (\"AllSets.json\" file or \"AllSetFiles\" directory)", metavar="fileIn"
-    )
-    parser.add_argument(
-        "-s", help="MySQL Server Hostname", metavar="hostname"
-    )
-    parser.add_argument(
-        "-u", help="MySQL User", metavar="user"
-    )
-    parser.add_argument(
-        "-p", help="MySQL Password", metavar="password"
-    )
-    parser.add_argument(
-        "-d", help="MySQL Database", metavar="database", #required=True
-    )
-    parser.add_argument(
-        "-o", help="Output .sql file", metavar="fileOut"
-    )
+    parser.add_argument("-i", help="input source (\"AllSets.json\" file or \"AllSetFiles\" directory)", metavar="fileIn")
+    parser.add_argument("-s", help="MySQL Server Hostname", metavar="hostname")
+    parser.add_argument("-u", help="MySQL User", metavar="user")
+    parser.add_argument("-p", help="MySQL Password", metavar="password")
+    parser.add_argument("-d", help="MySQL Database", metavar="database")
+    parser.add_argument("-o", help="Output .sql file", metavar="fileOut")
     #group = parser.add_mutually_exclusive_group()
     #group.add_argument("-f", "--force", action="store_true", help="Force overwrite (Disable warning prompts)")
     #group.add_argument("-r", "--refresh", action="store_true", help="Preserve current database (Update only)")
-    parser.add_argument(
-        "-f", help="Force overwrite (Disable warning prompts)", action="store_true"
-    )
-    parser.add_argument(
-        "-r", help="Preserve current database (Update only)", action="store_true"
-    )
+    parser.add_argument("-f", help="Force overwrite (Disable warning prompts)", action="store_true")
+    parser.add_argument("-r", help="Preserve current database (Update only)", action="store_true")
     args = parser.parse_args()
     global sql_connection
     # Define our I/O paths
@@ -97,8 +81,7 @@ def main() -> None:
 
     build_sql_schema(output)
     parse_and_import_cards(input_file, output)
-    
-    
+
     sql_connection.close()
     file_handler.close()
 
@@ -722,10 +705,10 @@ def sql_dict_insert(
         global file_handle
         for key in data.keys():
             if isinstance(data[key], str):
-                data[key] = data[key].replace("'","\\'").replace("\"","\\\"").replace("`","\\`")
-            if str(data[key]) == "False": data[key] = "0"
-            if str(data[key]) == "True": data[key] = "1"
+                data[key] = "'" + data[key].replace("'","\\'").replace("\"","\\\"").replace("`","\\`") + "'"
+            if str(data[key]) == "False": data[key] = 0
+            if str(data[key]) == "True": data[key] = 1
                 
-        query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES ('{" + "}', '{".join(data.keys()) + "}');\n"
+        query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES ({" + "}, {".join(data.keys()) + "});\n"
         query = query.format(**data)
         file_handle.write(query)
