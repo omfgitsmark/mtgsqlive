@@ -63,7 +63,8 @@ def main() -> None:
             #tmpAnswer = input("Path for .sql file? ")
             #output["file"] = pathlib.Path(tmpAnswer).expanduser()
             output["file"] = pathlib.Path(input("Enter path for .sql file: ")).expanduser()
-        else:
+        tmpAnswer = input("Output to server? (y/n): ")
+        if (tmpAnswer.lower() == "y" or tmpAnswer.lower() == "yes"):
             output["host"] = input("MySQL Server Hostname: ")
             if ":" in output["host"]:
                 tmparr = output["host"].split(":")
@@ -82,8 +83,7 @@ def main() -> None:
     build_sql_schema(output)
     parse_and_import_cards(input_file, output)
 
-    sql_connection.close()
-    file_handler.close()
+    close_all_connections()
 
 def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
     """
@@ -160,6 +160,20 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
         cursor.execute("Use {};".format(output["database"]))
     return True
 
+def close_all_connections():
+    """
+    Close any connections opened in the conversion process.
+    """
+    try:
+        global sql_connection
+        sql_connection.close()
+    except:
+        None
+    try:
+        global file_handle
+        file_handle.close()
+    except:
+        None
 
 def build_sql_schema(output: Dict[str, Any]) -> None:
     """
