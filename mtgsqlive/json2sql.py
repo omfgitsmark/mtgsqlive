@@ -11,8 +11,6 @@ from getpass import getpass
 from typing import Any, Dict, List, Union
 
 LOGGER = logging.getLogger(__name__)
-sql_connection = None
-file_handle = None
 version = "v4.5.x"
 
 def main() -> None:
@@ -32,7 +30,6 @@ def main() -> None:
     parser.add_argument("-f", help="Force overwrite (Disable warning prompts)", action="store_true")
     parser.add_argument("-r", help="Preserve current database (Update only)", action="store_true")
     args = parser.parse_args()
-    global sql_connection
     # Define our I/O paths
     if args.i:
         input_file = pathlib.Path(args.i).expanduser()
@@ -43,7 +40,7 @@ def main() -> None:
             #tmpAnswer += "/" if not tmpAnswer[-1] == "/" and not tmpAnswer[-1] == "\\" else ""
             #tmpAnswer += "AllSets.json"
         input_file = pathlib.Path(tmpAnswer).expanduser()
-    output = {}
+    output = {"handle": None,"conn": None}
     output["mode"] = "refresh" if args.r else "force" if args.f else "normal"
     if args.o:
         output = {"file": pathlib.Path(args.o).expanduser()}
@@ -52,7 +49,7 @@ def main() -> None:
             pw = args.p
         else:
             pw = getpass("MySQL Password: ")
-        output = {"host": args.s, "port": "3306", "user": args.u, "passwd": pw, "database": args.d}
+        output.update({"host": args.s, "port": "3306", "user": args.u, "passwd": pw, "database": args.d})
         if ":" in output["host"]:
             tmparr = output["host"].split(":")
             output["host"] = tmparr[0] if tmparr[0] else "localhost"
@@ -106,9 +103,8 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
         if output["file"].is_file():
             LOGGER.warning("Output file {} exists already, moving it.".format(output["file"]))
             output["file"].replace(output["file"].parent.joinpath(output["file"].name + ".old"))
-        global file_handle
-        file_handle = open(output["file"], "w", encoding="utf8")
-        file_handle.write("\n".join([
+        output["handle"] = open(output["file"], "w", encoding="utf8")
+        output["handle"].write("\n".join([
         "-- MTGSQLive Output File",
         "-- ({})".format(str(time.strftime("%Y-%m-%d %H:%M:%S"))),
         "-- ",
@@ -124,9 +120,8 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
     #elif output["type"] == "database":
         # Connect and build the MySQL database
         # option file? https://dev.mysql.com/doc/connector-python/en/connector-python-option-files.html
-        global sql_connection
         try:
-            sql_connection = mysql.connector.connect(
+            output["conn"] = mysql.connector.connect(
                 host=output["host"],
                 port=output["port"],
                 user=output["user"],
@@ -136,7 +131,7 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
             LOGGER.fatal("Unable to connect to MySQL database. Error: {}".format(err))
             return False
         LOGGER.info("Successfully connected to MySQL database.")
-        cursor = sql_connection.cursor()
+        cursor = output["conn"].cursor()
         cursor.execute("SET AUTOCOMMIT = 0")
         #cursor.execute("SET sql_notes = 0") # hide warnings
         if not output["mode"] == "refresh":
@@ -145,16 +140,14 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
             if len(result) > 0:
                 if output["mode"] == "force":
                     cursor.execute("DROP DATABASE {}".format(output["database"]))
-                    sql_connection.commit()
+                    output["conn"].commit()
                 else:
                     answer = input("Database '{}' already exists! Overwrite it? (y/n): ".format(output["database"]))
                     if (answer.lower() == "y" or answer.lower() == "yes"):
                         cursor.execute("DROP DATABASE {}".format(output["database"]))
-                        sql_connection.commit()
+                        output["conn"].commit()
                     else:
-                        # rename or set mode to "refresh"
-                        LOGGER.fatal("Database '{}' could not be written. Exiting.".format(output["database"]))
-                        return False
+                        output["mode"] = "refresh"
         cursor.execute("CREATE DATABASE IF NOT EXISTS {} DEFAULT CHARACTER SET utf8 COLLATE utf8_general_ci;".format(output["database"]))
         #cursor.execute("SET sql_notes = 1") # Re-enable warnings
         cursor.execute("Use {};".format(output["database"]))
@@ -165,20 +158,18 @@ def close_all_connections():
     Close any connections opened in the conversion process.
     """
     try:
-        global sql_connection
-        sql_connection.close()
+        output["conn"].close()
     except:
         None
     try:
-        global file_handle
-        file_handle.close()
+        output["handle"].close()
     except:
         None
 
 def build_sql_schema(output: Dict[str, Any]) -> None:
     """
     Create the SQLite DB schema
-    :param sql_connection: Connection to the database
+    :param output: Connection to the database
     """
     LOGGER.info("Building SQL Schema")
     schemaQ = [
@@ -379,13 +370,11 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
     #)
     
     if "host" in output:
-        global sql_connection
-        cursor = sql_connection.cursor()
+        cursor = output["conn"].cursor()
         cursor.execute("".join(schemaQ))
-        sql_connection.commit()
+        output["conn"].commit()
     if "file" in output:
-        global file_handle
-        file_handle.write("\n".join(schemaQ) + "COMMIT;\n\n")
+        output["handle"].write("\n".join(schemaQ) + "COMMIT;\n\n")
         
 
 def parse_and_import_cards(
@@ -394,7 +383,7 @@ def parse_and_import_cards(
     """
     Parse the JSON cards and input them into the database
     :param input_file: AllSets.json file
-    :param sql_connection: Database connection
+    :param output: Database connection
     """
     if input_file.is_file():
         LOGGER.info("Loading JSON into memory")
@@ -446,9 +435,9 @@ def parse_and_import_cards(
                 sql_dict_insert(set_translation_attr, "set_translations", output)
     
     if "host" in output:
-        sql_connection.commit()
+        output["conn"].commit()
     if "file" in output:
-        file_handle.write("COMMIT;")
+        output["handle"].write("COMMIT;")
 
 
 def sql_insert_all_card_fields(
@@ -458,7 +447,7 @@ def sql_insert_all_card_fields(
     Given all of the card's data, insert the data into the
     appropriate SQLite tables.
     :param card_attributes: Tuple of data
-    :param sql_connection: DB Connection
+    :param output: DB Connection
     """
     sql_dict_insert(card_attributes["cards"], "cards", output)
 
@@ -695,12 +684,11 @@ def sql_dict_insert(
     Insert a dictionary into a sqlite table
     :param data: Dict to insert
     :param table: Table to insert to
-    :param sql_connection: SQL connection
+    :param output["conn"]: SQL connection
     """
     
     if "host" in output:
-        global sql_connection
-        cursor = sql_connection.cursor()
+        cursor = output["conn"].cursor()
         if output["mode"] == "refresh":
             if table in ["cards", "sets", "tokens"]:
                 query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES (" + ", ".join(["%s"] * len(data)) + ") ON DUPLICATE KEY UPDATE " + "=%s, ".join(data.keys()) + "=%s"
@@ -716,7 +704,6 @@ def sql_dict_insert(
             #print(data.values())
             cursor.execute(query, list(data.values()))
     if "file" in output:
-        global file_handle
         for key in data.keys():
             if isinstance(data[key], str):
                 data[key] = "'" + data[key].replace("'","\\'").replace("\"","\\\"").replace("`","\\`") + "'"
@@ -725,4 +712,4 @@ def sql_dict_insert(
                 
         query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES ({" + "}, {".join(data.keys()) + "});\n"
         query = query.format(**data)
-        file_handle.write(query)
+        output["handle"].write(query)
