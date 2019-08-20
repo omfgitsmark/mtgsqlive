@@ -172,8 +172,10 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
     :param output: Connection to the database
     """
     LOGGER.info("Building SQL Schema")
-    schemaQ = [
-        ### sets ###
+    schema = {}
+    
+    ### sets ###
+    schema["sets"] = [
         "CREATE TABLE IF NOT EXISTS `sets` (",
         "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "baseSetSize SMALLINT NOT NULL DEFAULT 0,",
@@ -197,8 +199,9 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "totalSetSize SMALLINT NOT NULL DEFAULT 0,",
         "type ENUM('archenemy', 'box', 'core','commander','draft_innovation','duel_deck','expansion','from_the_vault','funny','masters','masterpiece','memorabilia','spellbook','planechase','premium_deck','promo','starter','token','treasure_chest','vanguard') NOT NULL",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        "",
-        ### cards ###
+        ""]
+    ### cards ###
+    schema["cards"] = [
         "CREATE TABLE IF NOT EXISTS `cards` (",
         #"id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "artist VARCHAR(100),",
@@ -272,8 +275,9 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "variations VARCHAR(3000),",
         "watermark VARCHAR(30)",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        "",
-        ### tokens ###
+        ""]
+    ### tokens ###
+    schema["tokens"] = [
         "CREATE TABLE IF NOT EXISTS `tokens` (",
         #"id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "artist VARCHAR(100),",
@@ -304,8 +308,9 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "uuidV421 CHAR(36),",
         "watermark VARCHAR(30)",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        "",
-        ### set_translations ###
+        ""]
+    ### set_translations ###
+    schema["set_translations"] = [
         "CREATE TABLE IF NOT EXISTS `set_translations` (",
         "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "language ENUM('Chinese Simplified', 'Chinese Traditional', 'French', 'German', 'Italian', 'Japanese', 'Korean', 'Portuguese (Brazil)', 'Russian', 'Spanish') NOT NULL,",
@@ -314,8 +319,9 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "INDEX (setCode),",
         "FOREIGN KEY (setCode) REFERENCES sets(code) ON UPDATE CASCADE ON DELETE CASCADE",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        "",
-        ### foreignData ###
+        ""]
+    ### foreignData ###
+    schema["foreignData"] = [
         "CREATE TABLE IF NOT EXISTS `foreignData` (",
         "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "uuid CHAR(36) NOT NULL,",
@@ -328,8 +334,9 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "text VARCHAR(1200),",
         "type VARCHAR(255)",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        "",
-        ### legalities ###
+        ""]
+    ### legalities ###
+    schema["legalities"] = [
         "CREATE TABLE IF NOT EXISTS `legalities` (",
         "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "uuid CHAR(36) NOT NULL,",
@@ -338,8 +345,9 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "format ENUM('standard', 'modern', 'legacy', 'vintage', 'commander', 'duel', 'frontier', 'future', 'oldschool', 'penny', 'pauper', 'brawl') NOT NULL,",
         "status ENUM('Legal', 'Restricted', 'Banned', 'Future') NOT NULL",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        "",
-        ### rulings ###
+        ""]
+    ### rulings ###
+    schema["rulings"] = [
         "CREATE TABLE IF NOT EXISTS `rulings` (",
         "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "uuid CHAR(36) NOT NULL," 
@@ -348,8 +356,9 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "date DATE," 
         "text VARCHAR(2000)" 
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        "",
-        ### prices ###
+        ""]
+    ### prices ###
+    schema["prices"] = [
         "CREATE TABLE IF NOT EXISTS `prices` (",
         "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
         "uuid CHAR(36) NOT NULL,",
@@ -359,8 +368,7 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "price REAL,",
         "date DATE",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
-        ""
-    ]
+        ""]
     ### meta ###
     #cursor.execute("CREATE TABLE IF NOT EXISTS `meta` ("
     #    "id INTEGER PRIMARY KEY AUTO_INCREMENT,"
@@ -371,11 +379,13 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
     
     if "host" in output:
         cursor = output["conn"].cursor()
-        cursor.execute("".join(schemaQ), None, True)
+        for q in schema.values():
+            cursor.execute("".join(q))
         output["conn"].commit()
     if "file" in output:
-        output["handle"].write("\n".join(schemaQ) + "COMMIT;\n\n")
-        
+        for q in schema:
+            output["handle"].write("\n".join(q) + "COMMIT;\n\n")
+        output["handle"].write("COMMIT;\n\n")
 
 def parse_and_import_cards(
     input_file: pathlib.Path, output: Dict[str, Any]
