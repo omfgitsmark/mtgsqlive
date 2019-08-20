@@ -371,7 +371,7 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
     
     if "host" in output:
         cursor = output["conn"].cursor()
-        cursor.execute("".join(schemaQ, multi=True))
+        cursor.execute("".join(schemaQ), None, True)
         output["conn"].commit()
     if "file" in output:
         output["handle"].write("\n".join(schemaQ) + "COMMIT;\n\n")
