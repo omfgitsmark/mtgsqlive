@@ -383,8 +383,8 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
             cursor.execute("".join(q))
         output["conn"].commit()
     if "file" in output:
-        for q in schema:
-            output["handle"].write("\n".join(q) + "COMMIT;\n\n")
+        for q in schema.values():
+            output["handle"].write("\n".join(q))
         output["handle"].write("COMMIT;\n\n")
 
 def parse_and_import_cards(
