@@ -23,7 +23,9 @@ def main() -> None:
     parser.add_argument("-u", help="MySQL User", metavar="user")
     parser.add_argument("-p", help="MySQL Password", metavar="password")
     parser.add_argument("-d", help="MySQL Database", metavar="database")
+    #parser.add_argument("-c", help="MySQL Config File", metavar="configFile")
     parser.add_argument("-o", help="Output .sql file", metavar="fileOut")
+    # really want to implement this mutually_exclusive_group feature below but I can't seem to get it working
     #group = parser.add_mutually_exclusive_group()
     #group.add_argument("-f", "--force", action="store_true", help="Force overwrite (Disable warning prompts)")
     #group.add_argument("-r", "--refresh", action="store_true", help="Preserve current database (Update only)")
@@ -32,7 +34,7 @@ def main() -> None:
     args = parser.parse_args()
     # Define our I/O paths
     if args.i:
-        input_file = pathlib.Path(args.i).expanduser()
+        input_file = pathlib.Path(args.i.strip()).expanduser()
     else:
         tmpAnswer = input("Enter path to AllSets.json file: ")
         if not "allsets.json" in tmpAnswer.lower() or "allsetfiles" in tmpAnswer.lower(): # case-insensitive
@@ -43,7 +45,8 @@ def main() -> None:
     output = {"handle": None,"conn": None}
     output["mode"] = "refresh" if args.r else "force" if args.f else "normal"
     if args.o:
-        output = {"file": pathlib.Path(args.o).expanduser()}
+        output["file"] = pathlib.Path(args.o.strip()).expanduser()
+        # check for .sql extension, else append default filename
     elif args.s and args.u and args.d:
         if args.p:
             pw = args.p
@@ -59,20 +62,24 @@ def main() -> None:
         if (tmpAnswer.lower() == "y" or tmpAnswer.lower() == "yes"):
             #tmpAnswer = input("Path for .sql file? ")
             #output["file"] = pathlib.Path(tmpAnswer).expanduser()
-            output["file"] = pathlib.Path(input("Enter path for .sql file: ")).expanduser()
+            output["file"] = pathlib.Path(input("Enter path for .sql file: ").strip()).expanduser()
         tmpAnswer = input("Output to server? (y/n): ")
         if (tmpAnswer.lower() == "y" or tmpAnswer.lower() == "yes"):
-            output["host"] = input("MySQL Server Hostname: ")
+            if args.s:
+                output["host"] = args.s
+            else:
+                output["host"] = input("MySQL Server Hostname: ").strip()
             if ":" in output["host"]:
                 tmparr = output["host"].split(":")
                 output["host"] = tmparr[0]
                 output["port"] = tmparr[-1]
             else:
-                output["port"] = input("MySQL Server Port (default 3306): ")
+                #output["port"] = input("MySQL Server Port (default 3306): ")
+                output["port"] = "3306"
             if output["port"].strip() == "": output["port"] = "3306"
-            output["user"] = input("MySQL Username: ")
+            output["user"] = input("MySQL Username: ").strip()
             output["passwd"] = getpass("MySQL Password: ")
-            output["database"] = input("MySQL Database: ")
+            output["database"] = input("MySQL Database: ").strip()
 
     if not validate_io_streams(input_file, output):
         exit(1)
@@ -80,7 +87,14 @@ def main() -> None:
     build_sql_schema(output)
     parse_and_import_cards(input_file, output)
 
-    close_all_connections()
+    try:
+        output["conn"].close()
+    except:
+        None
+    try:
+        output["handle"].close()
+    except:
+        None
 
 def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
     """
@@ -89,6 +103,10 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
     :param output_file: Output file (SQLite)
     :return: Good to continue status
     """
+    # some simple checks & warnings
+    if "file" in output and not "host" in output and output["mode"] == "refresh":
+        LOGGER.info("File output chosen, refresh mode will be ignored.")
+    
     if input_file.is_file():
         # check file extension here
         LOGGER.info("Building using AllSets.json master file.")
@@ -99,8 +117,12 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
         return False
     if "file" in output:
     #if output["type"] == "file":
+        if output["file"].is_dir():
+            output["file"] = output["file"].joinpath("mtgjson.sql")
+            LOGGER.info("No output filename provided! Writing to \"{}\".".format(output["file"]))
         output["file"].parent.mkdir(exist_ok=True)
         if output["file"].is_file():
+            
             LOGGER.warning("Output file {} exists already, moving it.".format(output["file"]))
             output["file"].replace(output["file"].parent.joinpath(output["file"].name + ".old"))
         output["handle"] = open(output["file"], "w", encoding="utf8")
@@ -152,19 +174,6 @@ def validate_io_streams(input_file: pathlib.Path, output: Dict) -> bool:
         #cursor.execute("SET sql_notes = 1") # Re-enable warnings
         cursor.execute("Use {};".format(output["database"]))
     return True
-
-def close_all_connections():
-    """
-    Close any connections opened in the conversion process.
-    """
-    try:
-        output["conn"].close()
-    except:
-        None
-    try:
-        output["handle"].close()
-    except:
-        None
 
 def build_sql_schema(output: Dict[str, Any]) -> None:
     """
@@ -336,14 +345,34 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
         ""]
     ### legalities ###
+    # schema["legalities"] = [
+        # "CREATE TABLE IF NOT EXISTS `legalities` (",
+        # "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
+        # "uuid CHAR(36) NOT NULL,",
+        # "INDEX (uuid),",
+        # "FOREIGN KEY (uuid) REFERENCES cards(uuid) ON UPDATE CASCADE ON DELETE CASCADE,",
+        # "format ENUM('standard', 'modern', 'legacy', 'vintage', 'commander', 'duel', 'frontier', 'future', 'oldschool', 'penny', 'pauper', 'brawl') NOT NULL,",
+        # "status ENUM('Legal', 'Restricted', 'Banned', 'Future') NOT NULL",
+        # ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
+        # ""]
     schema["legalities"] = [
         "CREATE TABLE IF NOT EXISTS `legalities` (",
         "id INTEGER PRIMARY KEY AUTO_INCREMENT,",
-        "uuid CHAR(36) NOT NULL,",
-        "INDEX (uuid),",
-        "FOREIGN KEY (uuid) REFERENCES cards(uuid) ON UPDATE CASCADE ON DELETE CASCADE,",
-        "format ENUM('standard', 'modern', 'legacy', 'vintage', 'commander', 'duel', 'frontier', 'future', 'oldschool', 'penny', 'pauper', 'brawl') NOT NULL,",
-        "status ENUM('Legal', 'Restricted', 'Banned', 'Future') NOT NULL",
+        "uuid char(36) UNIQUE NOT NULL,",
+        "standard enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "modern enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "legacy enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "vintage enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "commander enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "duel enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "frontier enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "future enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "oldschool enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "penny enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "pauper enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "brawl enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        #"INDEX (uuid),",
+        "FOREIGN KEY (uuid) REFERENCES cards (uuid) ON DELETE CASCADE ON UPDATE CASCADE",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
         ""]
     ### rulings ###
@@ -710,16 +739,27 @@ def sql_dict_insert(
                     query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES (" + ", ".join(["%s"] * len(data)) + ")"
                     cursor.execute(query, list(data.values()))
         else:
-            query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES (" + ", ".join(["%s"] * len(data)) + ")"
-            #print(data.values())
-            cursor.execute(query, list(data.values()))
+            if table == "legalities":
+                cursor.execute("SELECT id FROM legalities WHERE uuid=%s", (data["uuid"],))
+                result = cursor.fetchall()
+                if len(result) > 0:
+                    rowid = result[0][0]
+                    cursor.execute("UPDATE legalities SET " + data["format"] + "=%s WHERE id=%s",(data["status"], rowid))
+                else:
+                    cursor.execute("INSERT INTO legalities (uuid, " + data["format"] + ") VALUES (%s, %s)", (data["uuid"], data["status"]))
+            else:
+                query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES (" + ", ".join(["%s"] * len(data)) + ")"
+                #print(data.values())
+                cursor.execute(query, list(data.values()))
     if "file" in output:
-        for key in data.keys():
-            if isinstance(data[key], str):
-                data[key] = "'" + data[key].replace("'","\\'").replace("\"","\\\"").replace("`","\\`") + "'"
-            if str(data[key]) == "False": data[key] = 0
-            if str(data[key]) == "True": data[key] = 1
-                
-        query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES ({" + "}, {".join(data.keys()) + "});\n"
-        query = query.format(**data)
+        if table == "legalities":
+            query = "INSERT INTO legalities (uuid, " + data["format"] + ") VALUES ('" + data["uuid"] + "', '" + data["status"] + "') ON DUPLICATE KEY UPDATE " + data["format"] + "='" + data["status"] + "';\n"
+        else:
+            for key in data.keys():
+                if isinstance(data[key], str):
+                    data[key] = "'" + data[key].replace("'","\\'").replace("\"","\\\"").replace("`","\\`") + "'"
+                if str(data[key]) == "False": data[key] = 0
+                if str(data[key]) == "True": data[key] = 1
+            query = "INSERT INTO " + table + " (" + ", ".join(data.keys()) + ") VALUES ({" + "}, {".join(data.keys()) + "});\n"
+            query = query.format(**data)
         output["handle"].write(query)
