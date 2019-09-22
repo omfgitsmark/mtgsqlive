@@ -29,7 +29,10 @@ This system was built using *Python 3.7*, so we can only guarantee proper functi
 $ pip3 install -r requirements.txt 
 
 # usage: mtgsqlive [-h] -s mySQL_server_hostname[:port] -u mySQL_user [-p mySQL_password] -d mySQL_database [-f][-r]
-$ python3 -m mtgsqlive -s localhost -u root -p ****** -d mtg
+$ python3 -m mtgsqlive -i Allsets.json -s localhost -u root -p ****** -d mtg
+
+# Output to .sql file
+$ python3 -m mtgsqlive -i AllSets.json -o AllSets.sql
 
 # If no parameters provided you will be prompted, so you can simply run:
 $ python3 -m mtgsqlive
