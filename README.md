@@ -31,6 +31,9 @@ $ pip3 install -r requirements.txt
 # usage: mtgsqlive [-h] -s mySQL_server_hostname[:port] -u mySQL_user [-p mySQL_password] -d mySQL_database [-f][-r]
 $ python3 -m mtgsqlive -s localhost -u root -p ****** -d mtg
 
+# If no parameters provided you will be prompted, so you can simply run:
+$ python3 -m mtgsqlive
+
 ```  
 
 >**NOTE:** The -p parameter is not required, but you will be prompted to enter it during execution if not provided.
