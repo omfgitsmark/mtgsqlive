@@ -226,6 +226,7 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "flavorText VARCHAR(500),",
         "frameEffect ENUM('colorshifted', 'compasslanddfc', 'devoid', 'draft', 'legendary', 'miracle', 'mooneldrazidfc', 'nyxtouched', 'originpwdfc', 'sunmoondfc', 'tombstone') DEFAULT NULL,",
         "frameVersion ENUM('1993', '1997', '2003', '2015', 'future') NOT NULL,",
+        "leadershipSkills VARCHAR(1000),"
         "hand VARCHAR(3),",
         "hasFoil TINYINT(1) NOT NULL DEFAULT 0,",
         "hasNonFoil TINYINT(1) NOT NULL DEFAULT 0,",
@@ -445,7 +446,7 @@ def parse_and_import_cards(
                 token_attr = handle_token_row_insertion(token, set_code)
                 sql_dict_insert(token_attr, "tokens", output)
 
-            for language, translation in set_data["translations"].items():
+            for language, translation in set_data.get("translations", {}).items():
                 LOGGER.debug("Inserting set_translation row for {}".format(language))
                 set_translation_attr = handle_set_translation_row_insertion(language, translation, set_code)
                 sql_dict_insert(set_translation_attr, "set_translations", output)
@@ -468,7 +469,7 @@ def parse_and_import_cards(
                 token_attr = handle_token_row_insertion(token, set_code)
                 sql_dict_insert(token_attr, "tokens", output)
 
-            for language, translation in set_data["translations"].items():
+            for language, translation in set_data.get("translations", {}).items():
                 LOGGER.debug("Inserting set_translation row for {}".format(language))
                 set_translation_attr = handle_set_translation_row_insertion(language, translation, set_code)
                 sql_dict_insert(set_translation_attr, "set_translations", output)
