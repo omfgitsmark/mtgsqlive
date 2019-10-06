@@ -228,6 +228,7 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "frameVersion ENUM('1993', '1997', '2003', '2015', 'future') NOT NULL,",
         "leadershipSkills VARCHAR(1000),"
         "hand VARCHAR(3),",
+        "hasNoDeckLimit TINYINT(1) NOT NULL DEFAULT 0,",
         "hasFoil TINYINT(1) NOT NULL DEFAULT 0,",
         "hasNonFoil TINYINT(1) NOT NULL DEFAULT 0,",
         "isAlternative TINYINT(1) NOT NULL DEFAULT 0,",
