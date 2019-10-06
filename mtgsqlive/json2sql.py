@@ -372,6 +372,7 @@ def build_sql_schema(output: Dict[str, Any]) -> None:
         "penny enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
         "pauper enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
         "brawl enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
+        "historic enum('Legal','Not Legal','Restricted','Banned','Future') NOT NULL DEFAULT 'Not Legal',",
         #"INDEX (uuid),",
         "FOREIGN KEY (uuid) REFERENCES cards (uuid) ON DELETE CASCADE ON UPDATE CASCADE",
         ") ENGINE=InnoDB DEFAULT CHARSET=utf8;",
